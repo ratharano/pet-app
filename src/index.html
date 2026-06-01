@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#f5f0e8" />
+  <meta name="description" content="Feed your pet on time and watch it grow." />
+  <title>PetHabit</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- First-time setup -->
+  <section id="onboarding" class="screen">
+    <div class="card center">
+      <p class="emoji-large" aria-hidden="true">🥚</p>
+      <h1>Welcome to PetHabit</h1>
+      <p class="muted">Feed your pet during a daily time window. Stay on schedule to help it grow.</p>
+      <label class="label" for="petNameInput">Name your pet</label>
+      <input id="petNameInput" class="input" type="text" maxlength="20" placeholder="e.g. Mochi" autocomplete="off" />
+      <p class="hint">Default feeding window: 7:00 AM – 9:00 AM (change in code later)</p>
+      <button id="startBtn" class="btn btn-primary" type="button">Start</button>
+    </div>
+  </section>
+
+  <!-- Main pet screen -->
+  <section id="app" class="screen" hidden>
+    <header class="header">
+      <div>
+        <h2 id="petNameDisplay">—</h2>
+        <span id="stageLabel" class="chip">Egg</span>
+      </div>
+      <div class="streak-box">
+        <span class="label-small">Streak</span>
+        <span id="streakCount" class="streak-num">0</span>
+      </div>
+    </header>
+
+    <div class="pet-stage" aria-hidden="true">
+      <span id="petEmoji" class="emoji-large">🥚</span>
+    </div>
+
+    <p id="statusMessage" class="status" role="status"></p>
+
+    <div class="card">
+      <div class="stat">
+        <div class="stat-head">
+          <span>Health</span>
+          <span id="healthValue">0</span>
+        </div>
+        <div class="bar-track"><div id="healthBar" class="bar-fill health"></div></div>
+      </div>
+      <div class="stat">
+        <div class="stat-head">
+          <span>Happiness</span>
+          <span id="happinessValue">0</span>
+        </div>
+        <div class="bar-track"><div id="happinessBar" class="bar-fill happiness"></div></div>
+      </div>
+      <p class="hint">Feed window: <strong id="windowLabel">—</strong></p>
+    </div>
+
+    <button id="feedBtn" class="btn btn-primary btn-wide" type="button">Feed</button>
+    <button id="resetBtn" class="btn btn-ghost" type="button">Reset progress</button>
+  </section>
+
+  <!-- ES modules: app.js imports state.js and logic.js -->
+  <script type="module" src="app.js"></script>
+</body>
+</html>
