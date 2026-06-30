@@ -1,70 +1,78 @@
-# PetHabit
+# Sanctuary Pet
 
-Lightweight mobile habit tracker: feed your digital pet **on time** and watch it grow.
+A lightweight mobile habit tracker: feed your digital pet **on time** and watch it grow (EGG → BABY → ADULT).
 
-## Project layout
+**V1 only** — no backend, no React/Vue, no game economy. Plain HTML + CSS + JavaScript in `src/`.
+
+## Folder structure
 
 ```
-pet-app/
-├── src/                 ← Web app (Capacitor copies this to native builds)
-│   ├── index.html       ← Structure
-│   ├── style.css        ← Look and feel
-│   ├── app.js           ← Buttons, bars, screens
-│   ├── state.js         ← Save/load JSON from Local Storage
-│   └── logic.js         ← Feed window rules, health, happiness, streak
-├── capacitor.config.json
-└── package.json
+src/
+├── index.html   ← UI
+├── style.css    ← Cozy mobile styles
+├── app.js       ← DOM / buttons
+├── state.js     ← localStorage + JSON shape
+└── logic.js     ← Feed window rules & stats
 ```
 
-The old single-file `index.html` in the repo root is the previous prototype. **Use `src/` going forward.**
+## Terminal setup
 
-## Terminal setup (run once)
-
-From the project folder:
+Run from the project folder:
 
 ```bash
-cd /Users/ratha/Downloads/pet-app
+# 1. Go to the project
+cd path/to/pet-app
 
-# 1. Install Node dependencies
-npm install
+# 2. Create package.json and install Capacitor (skip if already done)
+npm init -y
+npm install @capacitor/core @capacitor/cli @capacitor/ios @capacitor/android
 
-# 2. Capacitor is already configured (webDir: src).
-#    Add native platforms:
+# 3. Tell Capacitor your web files live in src/
+npx cap init "Sanctuary Pet" com.sanctuarypet.app --web-dir src
+
+# 4. Add native projects
 npx cap add ios
 npx cap add android
 
-# 3. After you change any file in src/, sync to native projects:
+# 5. After editing src/, copy files into native apps
 npx cap sync
 ```
 
-### Preview in the browser
+### Preview in browser
 
 ```bash
+npm install
 npm start
 ```
 
-Open http://localhost:3000
+Open **http://localhost:3000** (uses Vite — required so Capacitor plugins load).
 
-### Open in Xcode / Android Studio
+Do **not** open `src/index.html` directly in the browser (file://) or use a plain static server on `src/` — imports will fail.
+
+Before syncing to iOS/Android, build the web app:
 
 ```bash
-npx cap open ios
-# or
-npx cap open android
+npm run build
+npx cap sync
 ```
 
-You need Xcode (Mac) for iOS and Android Studio for Android installed on your machine.
+### Open native IDEs
 
-## V1 rules (see `src/logic.js`)
+```bash
+npx cap open ios      # needs Xcode + CocoaPods on Mac
+npx cap open android  # needs Android Studio
+```
+
+## V1 rules (`logic.js`)
 
 | Action | Health | Happiness | Streak |
 |--------|--------|-----------|--------|
-| Fed **inside** window (e.g. 7–9 AM) | +10 | +15 | +1 |
-| Fed **late** (same day, outside window) | no change | −15 | no change |
-| **Missed** yesterday entirely | −25 | −30 | reset to 0 |
+| Fed **inside** window | +10 | +15 | +1 |
+| Fed **late** same day | no change | −15 | unchanged |
+| **Missed** yesterday (on open) | −25 | −30 | reset → 0 |
 
-Growth: **Egg** → **Baby** (7-day streak) → **Adult** (30-day streak).
+Evolution: **EGG** → **BABY** (7-day on-time streak) → **ADULT** (30 days).
 
-## Data shape (`src/state.js`)
+## Save data
 
-Saved under Local Storage key `pethabit_v2` as JSON.
+Stored with `@capacitor/preferences` under key `sanctuary_pet_v1` (UserDefaults on iOS, SharedPreferences on Android). In the browser dev server, Preferences uses localStorage as a fallback.

@@ -1,7 +1,7 @@
 {
-  "appId": "com.pethabit.app",
-  "appName": "PetHabit",
-  "webDir": "src",
+  "appId": "com.sanctuarypet.app",
+  "appName": "Sanctuary Pet",
+  "webDir": "dist",
   "server": {
     "androidScheme": "https"
   }

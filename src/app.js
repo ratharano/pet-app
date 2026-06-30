@@ -1,15 +1,15 @@
 /**
- * app.js — Connects the HTML buttons and bars to state.js + logic.js.
+ * ============================================================================
+ * app.js — UI layer (connects HTML to state.js + logic.js)
+ * ============================================================================
  *
- * Flow on each page load:
- *   1. Load save from localStorage
- *   2. Check for missed days (logic.applyMissedDayIfNeeded)
- *   3. Draw the pet screen
+ * Storage is ASYNC (Capacitor Preferences). Any time we load or save,
+ * we use await:
  *
- * When user taps "Feed":
- *   1. logic.calculateFeedOutcome / applyFeed
- *   2. saveState
- *   3. Refresh UI
+ *   state = await loadState();
+ *   await saveState(state);
+ *
+ * boot(), handleStart(), handleFeed(), and handleReset() are all async.
  */
 
 import {
@@ -24,13 +24,10 @@ import {
   applyMissedDayIfNeeded,
   applyFeed,
   formatFeedWindow,
+  formatStage,
   getPetMoodSummary,
   isWithinFeedWindow,
 } from './logic.js';
-
-// ---------------------------------------------------------------------------
-// DOM references (filled in when the page loads)
-// ---------------------------------------------------------------------------
 
 const $ = (id) => document.getElementById(id);
 
@@ -57,15 +54,12 @@ function cacheDom() {
   };
 }
 
-// ---------------------------------------------------------------------------
-// In-memory copy of the save (synced to localStorage on every change)
-// ---------------------------------------------------------------------------
-
+/** In-memory copy of the save (synced with Preferences via saveState) */
 let state = null;
 
-// ---------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
 // UI helpers
-// ---------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
 
 function setBar(fillEl, valueEl, value) {
   const v = Math.round(value);
@@ -73,9 +67,9 @@ function setBar(fillEl, valueEl, value) {
   valueEl.textContent = String(v);
 }
 
-function stageEmoji(stage, mood) {
+function pickPetEmoji(stage, mood) {
   if (mood === 'critical') return '💔';
-  if (stage === 'adult') return '🦁';
+  if (stage === 'adult') return '🦊';
   if (stage === 'baby') return '🐣';
   return '🥚';
 }
@@ -84,7 +78,7 @@ function render() {
   if (!state) return;
 
   dom.petNameDisplay.textContent = state.petName;
-  dom.stageLabel.textContent = state.stage.charAt(0).toUpperCase() + state.stage.slice(1);
+  dom.stageLabel.textContent = formatStage(state.stage);
   dom.streakCount.textContent = String(state.streak);
   dom.windowLabel.textContent = formatFeedWindow(state.feedWindow);
 
@@ -92,7 +86,7 @@ function render() {
   setBar(dom.happinessBar, dom.happinessValue, state.happiness);
 
   const mood = getPetMoodSummary(state);
-  dom.petEmoji.textContent = stageEmoji(state.stage, mood);
+  dom.petEmoji.textContent = pickPetEmoji(state.stage, mood);
 
   const now = new Date();
   const today = todayDateString(now);
@@ -104,17 +98,13 @@ function render() {
     dom.feedBtn.textContent = 'Fed today ✓';
   } else {
     dom.feedBtn.disabled = false;
-    dom.feedBtn.textContent = inWindow ? 'Feed (on time!)' : 'Feed (late)';
+    dom.feedBtn.textContent = inWindow ? 'Feed (on time)' : 'Feed (late)';
   }
 }
 
 function showMessage(text) {
   dom.statusMessage.textContent = text || '';
 }
-
-// ---------------------------------------------------------------------------
-// Screens
-// ---------------------------------------------------------------------------
 
 function showOnboarding() {
   dom.onboarding.hidden = false;
@@ -127,80 +117,130 @@ function showApp() {
   render();
 }
 
-// ---------------------------------------------------------------------------
-// Event handlers
-// ---------------------------------------------------------------------------
+/** Prevent double-taps while an async save is running */
+function setButtonsBusy(busy) {
+  dom.feedBtn.disabled = busy;
+  dom.startBtn.disabled = busy;
+}
 
-function handleStart() {
+// -----------------------------------------------------------------------------
+// Async button handlers
+// -----------------------------------------------------------------------------
+
+async function handleStart() {
   const name = dom.petNameInput.value.trim();
   if (!name) {
     dom.petNameInput.focus();
     return;
   }
 
-  state = createDefaultState(name);
-  state.onboarded = true;
-  saveState(state);
+  setButtonsBusy(true);
 
-  const missed = applyMissedDayIfNeeded(state);
-  state = missed.state;
-  saveState(state);
+  try {
+    state = createDefaultState(name);
+    state.onboarded = true;
+    await saveState(state);
 
-  showApp();
-  showMessage(`Feed ${state.petName} between ${formatFeedWindow(state.feedWindow)} each day.`);
-}
+    const check = applyMissedDayIfNeeded(state);
+    state = check.state;
+    await saveState(state);
 
-function handleFeed() {
-  const { state: next, outcome } = applyFeed(state);
-  state = next;
-
-  if (!outcome.allowed) {
-    showMessage(outcome.message);
-    return;
+    showApp();
+    showMessage(
+      `Welcome to the sanctuary. Feed ${state.petName} between ${formatFeedWindow(state.feedWindow)}.`
+    );
+  } finally {
+    setButtonsBusy(false);
+    render();
   }
-
-  saveState(state);
-  showMessage(outcome.message);
-  render();
 }
 
-function handleReset() {
-  const ok = confirm('Reset all progress? This cannot be undone.');
+async function handleFeed() {
+  setButtonsBusy(true);
+
+  try {
+    const { state: next, outcome } = applyFeed(state);
+    state = next;
+
+    if (!outcome.allowed) {
+      showMessage(outcome.message);
+      return;
+    }
+
+    await saveState(state);
+    showMessage(outcome.message);
+    render();
+  } finally {
+    setButtonsBusy(false);
+    render();
+  }
+}
+
+async function handleReset() {
+  const ok = confirm('Reset all progress? Your pet will start over.');
   if (!ok) return;
-  clearState();
-  state = null;
+
+  await clearState();
   location.reload();
 }
 
-// ---------------------------------------------------------------------------
-// Boot
-// ---------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
+// Async boot — wait for save BEFORE showing pet or checking missed days
+// -----------------------------------------------------------------------------
 
-function boot() {
+async function boot() {
   cacheDom();
 
-  dom.startBtn.addEventListener('click', handleStart);
-  dom.feedBtn.addEventListener('click', handleFeed);
-  dom.resetBtn.addEventListener('click', handleReset);
+  dom.startBtn.addEventListener('click', () => {
+    handleStart().catch((err) => console.error('Start failed:', err));
+  });
+  dom.feedBtn.addEventListener('click', () => {
+    handleFeed().catch((err) => console.error('Feed failed:', err));
+  });
+  dom.resetBtn.addEventListener('click', () => {
+    handleReset().catch((err) => console.error('Reset failed:', err));
+  });
 
-  state = loadState();
+  // 1. Load save from native Preferences (must await!)
+  state = await loadState();
 
+  // 2. New player → welcome screen
   if (!state || !state.onboarded) {
     showOnboarding();
     return;
   }
 
-  // New day? Apply missed-day penalties before showing the pet.
-  const missed = applyMissedDayIfNeeded(state);
-  state = missed.state;
-  if (missed.missed) {
-    saveState(state);
+  // 3. Returning player → check missed days, then show pet
+  const check = applyMissedDayIfNeeded(state);
+  state = check.state;
+
+  if (check.missed) {
+    await saveState(state);
     showApp();
-    showMessage(missed.message);
+    showMessage(check.message);
     return;
   }
 
+  await saveState(state);
   showApp();
 }
 
-document.addEventListener('DOMContentLoaded', boot);
+function showBootError(message) {
+  const banner = document.getElementById('loadError');
+  if (banner) {
+    banner.hidden = false;
+    banner.textContent = message;
+  }
+  console.error(message);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  boot().catch((err) => {
+    console.error('App failed to start:', err);
+    cacheDom();
+    showBootError(
+      'App could not start. Run npm start and open http://localhost:3000 (not src/index.html).'
+    );
+    showOnboarding();
+  });
+});
